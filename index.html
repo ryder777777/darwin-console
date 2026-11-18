@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>DARWIN · console</title>
+<style>
+  :root{
+    --bg:#0a0d12; --panel:#11161f; --panel2:#0e131b; --line:#1d2634;
+    --text:#e6edf3; --muted:#8b98a8; --dim:#5f6c7b; --accent:#4c9aff;
+    --green:#3fb950; --amber:#d29922; --red:#f85149;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 18px 70px}
+  header{display:flex;justify-content:space-between;align-items:flex-start;
+         gap:16px;flex-wrap:wrap;margin-bottom:6px}
+  h1{font-size:20px;margin:0;letter-spacing:-.02em;font-weight:650}
+  h1 .omega{color:var(--accent)}
+  .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .pill{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;
+        letter-spacing:.03em;white-space:nowrap}
+  .pill.live{background:rgba(63,185,80,.13);color:var(--green)}
+  .pill.down{background:rgba(248,81,73,.13);color:var(--red)}
+  .pill.wait{background:rgba(139,152,168,.13);color:var(--muted)}
+  nav{display:flex;gap:4px;margin:18px 0 22px;border-bottom:1px solid var(--line);
+      overflow-x:auto;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{background:none;border:0;border-bottom:2px solid transparent;
+             color:var(--muted);font:inherit;font-size:13px;font-weight:550;
+             padding:9px 14px;cursor:pointer;white-space:nowrap;transition:color .12s}
+  nav button:hover{color:var(--text)}
+  nav button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+  section{display:none}
+  section.on{display:block}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(124px,1fr));
+         gap:10px;margin-bottom:22px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 14px}
+  .stat .v{font-size:23px;font-weight:640;letter-spacing:-.025em;line-height:1.15;
+           font-variant-numeric:tabular-nums}
+  .stat .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+           color:var(--dim);margin-top:3px;font-weight:600}
+  h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+     margin:26px 0 10px;font-weight:650}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:12px 14px;margin-bottom:9px;border-left:3px solid var(--dim)}
+  .card.ok{border-left-color:var(--green)}
+  .card.refuse{border-left-color:var(--amber)}
+  .card.neutral{border-left-color:var(--accent)}
+  .card .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+  .badge{font-size:9.5px;font-weight:750;letter-spacing:.07em;padding:2.5px 7px;
+         border-radius:20px;white-space:nowrap}
+  .badge.ok{background:rgba(63,185,80,.15);color:var(--green)}
+  .badge.refuse{background:rgba(210,153,34,.15);color:var(--amber)}
+  .badge.neutral{background:rgba(76,154,255,.15);color:var(--accent)}
+  .meta{color:var(--dim);font-size:11.5px;margin:4px 0 6px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .reason{font-size:12.5px;opacity:.9;font-style:italic;color:var(--text)}
+  .reason.none{opacity:.5;font-style:normal}
+  table{width:100%;border-collapse:collapse;background:var(--panel);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12.5px}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;
+     font-weight:650;position:sticky;top:0;background:var(--panel2)}
+  tr:last-child td{border-bottom:none}
+  td.num{width:50px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+  td.st{width:76px;font-size:11.5px;font-weight:600}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+       margin-right:8px;vertical-align:middle;flex:0 0 auto}
+  .note{background:rgba(76,154,255,.06);border:1px solid rgba(76,154,255,.22);
+        border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.55;
+        color:#c9d8ea;margin-top:14px}
+  .note.warn{background:rgba(210,153,34,.07);border-color:rgba(210,153,34,.28);color:#e8d9b0}
+  .note b{color:#fff}
+  .filters{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .filters button{background:var(--panel);border:1px solid var(--line);color:var(--muted);
+                  font:inherit;font-size:12px;padding:5px 11px;border-radius:7px;cursor:pointer}
+  .filters button[data-on="1"]{background:rgba(76,154,255,.13);
+                               border-color:rgba(76,154,255,.45);color:var(--accent)}
+  .empty{color:var(--dim);font-size:13px;padding:22px 2px;text-align:center}
+  footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);
+         color:var(--dim);font-size:11.5px;display:flex;justify-content:space-between;
+         gap:12px;flex-wrap:wrap}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  @media(max-width:560px){
+    .wrap{padding:18px 13px 60px}
+    .stat .v{font-size:20px}
+    .meta{white-space:normal}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>DARWIN<span class="omega">-Ω</span> · console</h1>
+      <div class="sub">swarm · LLM lane panel · finding triage</div>
+    </div>
+    <div id="status" class="pill wait">connecting…</div>
+  </header>
+
+  <nav role="tablist">
+    <button role="tab" aria-selected="true" data-tab="overview">Overview</button>
+    <button role="tab" aria-selected="false" data-tab="lanes">LLM lanes</button>
+    <button role="tab" aria-selected="false" data-tab="panel">Triage panel</button>
+    <button role="tab" aria-selected="false" data-tab="about">How it works</button>
+  </nav>
+
+  <!-- ------------------------------------------------------------ overview -->
+  <section id="overview" class="on">
+    <div class="stats" id="stat-row"></div>
+    <h2>Node</h2>
+    <div id="node-box"></div>
+    <h2>Where this data comes from</h2>
+    <div id="source-box"></div>
+  </section>
+
+  <!-- --------------------------------------------------------------- lanes -->
+  <section id="lanes">
+    <div class="stats" id="lane-stats"></div>
+    <h2>Every lane</h2>
+    <table>
+      <thead><tr><th>Lane</th><th style="text-align:right">ok</th>
+      <th style="text-align:right">fail</th><th>state</th></tr></thead>
+      <tbody id="lane-rows"><tr><td colspan="4" class="empty">loading…</td></tr></tbody>
+    </table>
+    <div class="note"><b>What a lane is.</b> One <span class="mono">(provider, model)</span>
+      pair with its own quota bucket. That distinction is why a $0 deployment has any
+      capacity at all: OVHcloud's anonymous endpoint rate-limits <i>per model</i>, so
+      eleven models are eleven fresh buckets. Measured 2026-11-18: ten rapid calls to
+      one model returned <span class="mono">[200,200,200,200,429×6]</span>, while ten
+      different models were never limited against each other.</div>
+  </section>
+
+  <!-- --------------------------------------------------------------- panel -->
+  <section id="panel">
+    <div class="stats" id="panel-stats"></div>
+    <div class="filters" id="panel-filters">
+      <button data-f="all" data-on="1">All</button>
+      <button data-f="killed">Killed</button>
+      <button data-f="refused">Refused a kill</button>
+      <button data-f="kept">Kept</button>
+    </div>
+    <div id="panel-list"></div>
+    <div class="note warn" id="panel-note"></div>
+  </section>
+
+  <!-- --------------------------------------------------------------- about -->
+  <section id="about">
+    <h2>The one rule</h2>
+    <div class="note"><b>An LLM may kill a finding. It may never create one.</b><br>
+      A model saying “this looks exploitable” is worth nothing until it executes. A model
+      saying “this is already guarded, the require is on line 91” is worth a lot, because
+      a human verifies that in ten seconds. Asymmetry of evidence, therefore asymmetry of
+      power. Cantina bans unvalidated AI submissions; nothing here writes a report.</div>
+
+    <h2>How a kill is earned</h2>
+    <div class="note">A finding is dropped only when
+      <b>a quorum of independent lanes returns FALSE_POSITIVE</b> <b>and</b> the stated
+      reason names code a human can go and read. Two gates stand between the panel and
+      the queue:
+      <ul style="margin:8px 0 0 18px;padding:0">
+        <li><span class="mono">_cites_code()</span> — the reason must contain an
+            identifier, a call, or a guard.</li>
+        <li><span class="mono">_argument_is_substantive()</span> — naming, style and
+            authority claims are vetoed even when they mention code.</li>
+      </ul>
+      Anything else — a lone vote, a tie, a dead panel, a vibe — leaves the finding
+      exactly where it was.</div>
+
+    <h2>Why the second gate exists</h2>
+    <div class="note warn">Measured live on GnosisChain tokenbridge-contracts: the panel
+      killed 6 of 9 findings, and while 4 reasons pointed at a real guard, two did not.
+      One argued that “the underscore prefix in
+      <span class="mono">_collectGasTokens()</span> indicates internal function,
+      restricting external access, making the unchecked call return value a non-issue.”
+      That is a naming convention, not a mechanism — an internal function can lose funds
+      perfectly well. Two kills in six were pattern-matching to the <i>shape</i> of an
+      argument. Both gates were added the same day those numbers were measured.</div>
+
+    <h2>What is never done here</h2>
+    <div class="note">No leaked credentials harvested from public repos. No IP or
+      session rotation to dodge a rate limit. No single key driven from many accounts.
+      Those are abuse, they get accounts terminated, and a bounty pipeline that does them
+      is worthless. Rotating across <i>one provider's own models</i> is the provider's
+      published behaviour, and that is all this does.</div>
+  </section>
+
+  <footer>
+    <span id="foot-left">static page · data fetched at open</span>
+    <span id="foot-right"></span>
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Data sources, tried in order. The first that answers wins.
+//
+// The Render node is the only one that can report LIVE state, and it is currently
+// suspended (monthly quota), so the page must be useful with zero network: the
+// snapshot below is embedded, not fetched. A dashboard that shows "error" when its
+// backend is down is a dashboard that tells you nothing exactly when you need it.
+// ---------------------------------------------------------------------------
+const NODE = "https://darwin-omega-wealth-swarm.onrender.com";
+const SNAPSHOT = {
+  generated: "2026-11-18T13:10:00Z",
+  source: "snapshot",
+  seconds: 498.5,
+  corpus: "tokenbridge-contracts (132 files)",
+  lanes_total: 23,
+  providers: 11,
+  health: {"lanes_total":23,"ready":11,"keyless_enabled":true,
+    "providers":["llm7","ovhcloud","pollinations"],
+    "lanes":[
+      {"lane":"ovhcloud/DeepSeek-V4.1-Flash-1017","state":"ready","ok":5,"fail":1,"cooldown_left":0},
+      {"lane":"ovhcloud/Mistral-Small-3.2-24B-Instruct-2506","state":"ready","ok":2,"fail":0,"cooldown_left":0},
+      {"lane":"ovhcloud/Qwen3.5-397B-A17B","state":"ready","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"ovhcloud/Qwen3.5-9B","state":"ready","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"ovhcloud/Qwen3.6-27B","state":"ready","ok":1,"fail":0,"cooldown_left":0},
+      {"lane":"ovhcloud/Qwen3.8-27B","state":"ready","ok":1,"fail":1,"cooldown_left":0},
+      {"lane":"ovhcloud/gemma-4-26b-a4b","state":"ready","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"ovhcloud/gpt-oss-120b","state":"ready","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"ovhcloud/nemotron3-nano-30b","state":"ready","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"ovhcloud/qwen3.6-35b-a3b","state":"ready","ok":3,"fail":0,"cooldown_left":0},
+      {"lane":"pollinations/openai","state":"ready","ok":6,"fail":1,"cooldown_left":0},
+      {"lane":"cerebras/llama-3.3-70b","state":"no-key","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"gemini/gemini-3.1-flash-lite","state":"no-key","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"gemini/gemini-3.5-flash","state":"no-key","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"groq/openai/gpt-oss-120b","state":"no-key","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"groq/openai/gpt-oss-20b","state":"no-key","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"llm7/DeepSeek-V4-Flash-0731","state":"cooling","ok":0,"fail":2,"cooldown_left":45},
+      {"lane":"mistral/mistral-small-latest","state":"no-key","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"nara/claude-sonnet-5","state":"no-key","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"nvidia/meta/llama-3.3-70b-instruct","state":"no-key","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"openrouter/qwen/qwen3.8-27b:free","state":"no-key","ok":0,"fail":0,"cooldown_left":0},
+      {"lane":"ovhcloud/Meta-Llama-3_3-70B-Instruct","state":"cooling","ok":2,"fail":2,"cooldown_left":30},
+      {"lane":"zai/glm-4.7-flash","state":"no-key","ok":0,"fail":0,"cooldown_left":0}
+    ]},
+  panel: [
+    {"contract":"Message","function":"recoverAddressFromSignedMessage(bytes,bytes,bool)","lens":"ecrecover_zero_address","confidence":0.5,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"The code requires that each recovered address passes _validatorContract.isValidator(recoveredAddress); a zero address will fail this check, preventing the ecrecover_zero_address issue.","lanes_used":["pollinations/openai","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"right"},
+    {"contract":"Message","function":"recoverAddressFromSignedMessage(bytes,bytes,bool)","lens":"ecrecover_zero_address","confidence":0.52,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":3},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"The require(_validatorContract.isValidator(recoveredAddress)) guard rejects the zero address returned by ecrecover, preventing the ecrecover_zero_address issue.","lanes_used":["pollinations/openai","ovhcloud/qwen3.6-35b-a3b","ovhcloud/Mistral-Small-3.2-24B-Instruct-2506"],"verdict_check":"right"},
+    {"contract":"ForeignBridgeErcToNative","function":"onExecuteMessage(address,uint256)","lens":"unchecked_call_return","confidence":0.45,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2,"UNCERTAIN":1},"agreement":0.67,"quorum_met":true,"cited":true,"substantive":true,"reason":"The flagged line is a standard ERC20 transferFrom call, not a low-level .call(), so the unchecked_call_return rule does not apply.","lanes_used":["pollinations/openai","ovhcloud/Qwen3.8-27B","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"right"},
+    {"contract":"HomeBridgeErcToNative","function":"executeAffirmation(address,uint256)","lens":"unchecked_call_return","confidence":0.4,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"address(0).transfer(valueToBurn) reverts on failure, so the return value is never used and cannot be unchecked.","lanes_used":["pollinations/openai","ovhcloud/Qwen3.6-27B"],"verdict_check":"right"},
+    {"contract":"HashiManager","function":"setThreshold(uint256)","lens":"unbounded_loop","confidence":0.35,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"The loop is bounded by values.length, which is a finite array size, so the loop cannot run indefinitely.","lanes_used":["pollinations/openai","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"right"},
+    {"contract":"GasTokenConnector","function":"_collectGasTokens()","lens":"unchecked_call_return","confidence":0.3,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":false,"reason":"The underscore prefix in _collectGasTokens() indicates internal function, restricting external access and making the unchecked call return value a non-issue for external attackers.","lanes_used":["pollinations/openai","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"wrong"},
+    {"contract":"Message","function":"hashMessage(bytes,bool)","lens":"packed_collision","confidence":0.4,"verdict":"FALSE_POSITIVE","killed":false,"votes":{"FALSE_POSITIVE":1},"agreement":1.0,"quorum_met":false,"cited":true,"substantive":true,"reason":"hashMessage is internal pure and only uses the message length and a constant string; the packing cannot produce a collision that escapes the function's logic.","lanes_used":["pollinations/openai","ovhcloud/Qwen3.8-27B"],"verdict_check":"refused"},
+    {"contract":"ERC20Bridge","function":"onTokenTransfer(address,uint256)","lens":"unchecked_call_return","confidence":0.3,"verdict":"UNCERTAIN","killed":false,"votes":{"UNCERTAIN":1},"agreement":1.0,"quorum_met":false,"cited":false,"substantive":false,"reason":"the provided code snippet does not contain the suspect parameter unchecked_call_return","lanes_used":["ovhcloud/Qwen3.6-27B"],"verdict_check":"kept"},
+    {"contract":"InterestConnector","function":"claimInterest(address,uint256)","lens":"unchecked_call_return","confidence":0.3,"verdict":"UNCERTAIN","killed":false,"votes":{"UNCERTAIN":1},"agreement":1.0,"quorum_met":false,"cited":true,"substantive":true,"reason":"The code calls ERC20(_token).transfer(receiver, _amount) without checking its boolean return; no guard or modifier neutralises this, so the issue depends on runtime token behaviour.","lanes_used":["pollinations/openai","ovhcloud/DeepSeek-V4.1-Flash-1017","ovhcloud/qwen3.6-35b-a3b"],"verdict_check":"kept"}
+  ]
+};
+
+const $ = (s, r = document) => r.querySelector(s);
+const el = (t, c, txt) => { const n = document.createElement(t); if (c) n.className = c;
+  if (txt != null) n.textContent = txt; return n; };
+const esc = s => String(s == null ? "" : s);
+const pct = n => Math.round((n || 0) * 100) + "%";
+
+const STATE_COLOR = { ready: "var(--green)", cooling: "var(--amber)", "no-key": "var(--dim)" };
+const STATE_LABEL = { ready: "ready", cooling: "cooling", "no-key": "no key" };
+
+function stat(value, label) {
+  const d = el("div", "stat");
+  d.append(el("div", "v", value), el("div", "k", label));
+  return d;
+}
+
+// ---------------------------------------------------------------------------
+// Fetch live state, but never block the render on it. Every request has a short
+// timeout and a failure is a label, not an exception.
+// ---------------------------------------------------------------------------
+function getJSON(url, ms) {
+  return new Promise((resolve, reject) => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => { ctl.abort(); reject(new Error("timeout")); }, ms);
+    fetch(url, { signal: ctl.signal, cache: "no-store" })
+      .then(r => { clearTimeout(t); if (!r.ok) throw new Error("HTTP " + r.status);
+                   return r.json(); })
+      .then(resolve)
+      .catch(e => { clearTimeout(t); reject(e); });
+  });
+}
+
+async function loadLive() {
+  const out = { health: null, node: null, error: "" };
+  try {
+    const [health, node] = await Promise.all([
+      getJSON(NODE + "/api/llm/health", 4500),
+      getJSON(NODE + "/health", 4500),
+    ]);
+    out.health = health; out.node = node;
+  } catch (e) {
+    out.error = String(e.message || e);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
+function renderOverview(data, live) {
+  const h = data.health || {};
+  const row = $("#stat-row");
+  row.replaceChildren(
+    stat(h.ready != null ? h.ready + "/" + (h.lanes_total || data.lanes_total) : "—", "lanes ready"),
+    stat(data.providers != null ? data.providers : (h.providers || []).length, "providers"),
+    stat((data.panel || []).length, "findings asked"),
+    stat((data.panel || []).filter(p => p.killed).length, "killed by panel"),
+    stat(data.seconds ? Math.round(data.seconds) + "s" : "—", "wall clock"),
+  );
+
+  const box = $("#node-box");
+  box.replaceChildren();
+  if (live.node) {
+    const c = el("div", "card ok");
+    const r = el("div", "row");
+    r.append(el("span", "mono", "render · " + (live.node.node_id || "primary")),
+             el("span", "badge ok", "LIVE"));
+    c.append(r);
+    c.append(el("div", "meta",
+      "build " + esc(live.node.build) + " · uptime " + Math.round(live.node.uptime_sec || 0) +
+      "s · agents " + esc(live.node.agents_active) + " · work " + esc(live.node.completed_work) +
+      " · evolutions " + esc(live.node.evolutions)));
+    box.append(c);
+  } else {
+    const c = el("div", "card refuse");
+    const r = el("div", "row");
+    r.append(el("span", "mono", "render · darwin-omega-wealth-swarm"),
+             el("span", "badge refuse", "SUSPENDED"));
+    c.append(r);
+    c.append(el("div", "meta",
+      "monthly quota exceeded — all services suspended 2026-11-18T12:20:40Z · " +
+      "this page is showing its embedded snapshot"));
+    box.append(c);
+  }
+
+  const src = $("#source-box");
+  src.replaceChildren();
+  const c = el("div", "card neutral");
+  const r = el("div", "row");
+  r.append(el("span", "mono", data.corpus || "corpus"),
+           el("span", "badge neutral", (data.source || "snapshot").toUpperCase()));
+  c.append(r);
+  c.append(el("div", "meta", "generated " + esc(data.generated)));
+  src.append(c);
+}
+
+function renderLanes(data) {
+  const h = data.health || {};
+  const lanes = (h.lanes || []).slice();
+  $("#lane-stats").replaceChildren(
+    stat(h.ready != null ? h.ready : lanes.filter(l => l.state === "ready").length,
+         "lanes ready"),
+    stat(lanes.length || data.lanes_total || 0, "total lanes"),
+    stat(lanes.filter(l => l.state === "cooling").length, "cooling"),
+    stat(lanes.filter(l => l.state === "no-key").length, "no key"),
+    stat(h.keyless_enabled ? "on" : "off", "keyless mode"),
+  );
+  const body = $("#lane-rows");
+  body.replaceChildren();
+  if (!lanes.length) {
+    const tr = el("tr"); const td = el("td", "empty", "no lane data in this snapshot");
+    td.colSpan = 4; tr.append(td); body.append(tr); return;
+  }
+  for (const l of lanes) {
+    const tr = el("tr");
+    const td1 = el("td");
+    const dot = el("span", "dot");
+    dot.style.background = STATE_COLOR[l.state] || "var(--dim)";
+    td1.append(dot, document.createTextNode(l.lane));
+    const ok = el("td", "num", String(l.ok || 0));
+    const fail = el("td", "num", String(l.fail || 0));
+    const st = el("td", "st", STATE_LABEL[l.state] || l.state);
+    st.style.color = STATE_COLOR[l.state] || "var(--dim)";
+    tr.append(td1, ok, fail, st);
+    body.append(tr);
+  }
+}
+
+let PANEL = [];
+let FILTER = "all";
+
+function bucket(p) {
+  if (p.killed) return "killed";
+  if (p.verdict === "FALSE_POSITIVE") return "refused";
+  return "kept";
+}
+
+function renderPanel(data) {
+  PANEL = data.panel || [];
+  const killed = PANEL.filter(p => p.killed).length;
+  const refused = PANEL.filter(p => bucket(p) === "refused").length;
+  $("#panel-stats").replaceChildren(
+    stat(PANEL.length, "asked"),
+    stat(killed, "killed"),
+    stat(refused, "kill refused"),
+    stat(PANEL.length ? pct(killed / PANEL.length) : "—", "kill rate"),
+  );
+  const note = $("#panel-note");
+  const right = PANEL.filter(p => p.verdict_check === "right").length;
+  const wrong = PANEL.filter(p => p.verdict_check === "wrong").length;
+  note.replaceChildren();
+  note.append(el("b", null, "The honest scorecard. "));
+  note.append(document.createTextNode(
+    right + " of " + killed + " kills were right, " + wrong + " were wrong. " +
+    "The wrong ones argued from a naming convention instead of a mechanism — which is " +
+    "exactly why the citation and substance gates exist. A kill that fails either gate " +
+    "does not happen."));
+  drawPanel();
+}
+
+function drawPanel() {
+  const list = $("#panel-list");
+  list.replaceChildren();
+  const rows = PANEL.filter(p => FILTER === "all" || bucket(p) === FILTER);
+  if (!rows.length) { list.append(el("div", "empty", "nothing in this bucket")); return; }
+  for (const p of rows) {
+    const b = bucket(p);
+    const cls = b === "killed" ? "ok" : (b === "refused" ? "refuse" : "neutral");
+    const label = b === "killed" ? "KILLED" : (b === "refused" ? "KILL REFUSED" : "KEPT");
+    const card = el("div", "card " + cls);
+    const head = el("div", "row");
+    head.append(el("span", "mono", p.lens || "?"),
+                el("span", "badge " + cls, label));
+    card.append(head);
+    card.append(el("div", "meta",
+      esc(p.contract) + " · " + esc(p.function) + " · confidence " + esc(p.confidence)));
+    const votes = Object.entries(p.votes || {}).map(([k, v]) => k + "×" + v).join(", ") || "—";
+    card.append(el("div", "meta",
+      "panel: " + votes + " · lanes " + (p.lanes_used || []).length +
+      " · agreement " + pct(p.agreement)));
+    const reason = el("div", "reason" + (p.reason ? "" : " none"),
+      p.reason ? "“" + p.reason + "”" : "no reason given");
+    card.append(reason);
+    if (p.verdict_check === "wrong") {
+      const w = el("div", "meta");
+      w.style.color = "var(--amber)";
+      w.textContent = "↳ hand-checked: this kill was wrong";
+      card.append(w);
+    }
+    list.append(card);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------------
+function tab(name) {
+  for (const b of document.querySelectorAll("nav button")) {
+    b.setAttribute("aria-selected", String(b.dataset.tab === name));
+  }
+  for (const s of document.querySelectorAll("section")) {
+    s.classList.toggle("on", s.id === name);
+  }
+  if (name === "panel") drawPanel();
+}
+for (const b of document.querySelectorAll("nav button")) {
+  b.addEventListener("click", () => tab(b.dataset.tab));
+}
+for (const b of document.querySelectorAll("#panel-filters button")) {
+  b.addEventListener("click", () => {
+    FILTER = b.dataset.f;
+    for (const o of document.querySelectorAll("#panel-filters button")) {
+      o.dataset.on = String(o === b);
+    }
+    drawPanel();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Boot: paint from the snapshot immediately, then upgrade to live if it answers.
+// ---------------------------------------------------------------------------
+function paint(data, live) {
+  renderOverview(data, live);
+  renderLanes(data);
+  renderPanel(data);
+  const pill = $("#status");
+  if (live.node) {
+    pill.className = "pill live";
+    pill.textContent = "live · render";
+  } else {
+    pill.className = "pill down";
+    pill.textContent = "node suspended · snapshot";
+  }
+  $("#foot-left").textContent =
+    live.node ? "static page · live data from render" : "static page · embedded snapshot";
+  $("#foot-right").textContent = "snapshot " + esc(data.generated);
+}
+
+paint(SNAPSHOT, { node: null });
+loadLive().then(live => {
+  if (!live.node) return;
+  const merged = JSON.parse(JSON.stringify(SNAPSHOT));
+  merged.source = "live";
+  merged.generated = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+  if (live.health) merged.health = live.health;
+  if (live.health && live.health.lanes_total) merged.lanes_total = live.health.lanes_total;
+  if (live.health && live.health.providers) merged.providers = live.health.providers.length;
+  paint(merged, live);
+});
+</script>
+</body>
+</html>
