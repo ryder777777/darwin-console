@@ -1,0 +1,8 @@
+{
+  "name": "darwin-console",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static dashboard for the DARWIN swarm: LLM lane health and finding-triage panel",
+  "scripts": { "test": "sh test/run.sh" },
+  "devDependencies": { "jsdom": "^24.0.0" }
+}

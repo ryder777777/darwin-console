@@ -102,18 +102,23 @@
       <h1>DARWIN<span class="omega">-Ω</span> · console</h1>
       <div class="sub">swarm · LLM lane panel · finding triage</div>
     </div>
-    <div id="status" class="pill wait">connecting…</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div id="status" class="pill wait">connecting…</div>
+      <button id="retry" class="pill" style="background:var(--panel);border:1px solid var(--line);
+              color:var(--muted);cursor:pointer;display:none">retry live</button>
+    </div>
   </header>
 
   <nav role="tablist">
-    <button role="tab" aria-selected="true" data-tab="overview">Overview</button>
-    <button role="tab" aria-selected="false" data-tab="lanes">LLM lanes</button>
-    <button role="tab" aria-selected="false" data-tab="panel">Triage panel</button>
-    <button role="tab" aria-selected="false" data-tab="about">How it works</button>
+    <button role="tab" aria-selected="true" aria-controls="overview" data-tab="overview">Overview</button>
+    <button role="tab" aria-selected="false" aria-controls="lanes" data-tab="lanes">LLM lanes</button>
+    <button role="tab" aria-selected="false" aria-controls="panel" data-tab="panel">Triage panel</button>
+    <button role="tab" aria-selected="false" aria-controls="about" data-tab="about">How it works</button>
   </nav>
 
   <!-- ------------------------------------------------------------ overview -->
-  <section id="overview" class="on">
+  <section id="overview" role="tabpanel" aria-labelledby="tab-overview" class="on">
+    <div id="provenance" style="margin-bottom:14px"></div>
     <div class="stats" id="stat-row"></div>
     <h2>Node</h2>
     <div id="node-box"></div>
@@ -122,7 +127,7 @@
   </section>
 
   <!-- --------------------------------------------------------------- lanes -->
-  <section id="lanes">
+  <section id="lanes" role="tabpanel" aria-labelledby="tab-lanes">
     <div class="stats" id="lane-stats"></div>
     <h2>Every lane</h2>
     <table>
@@ -139,8 +144,9 @@
   </section>
 
   <!-- --------------------------------------------------------------- panel -->
-  <section id="panel">
+  <section id="panel" role="tabpanel" aria-labelledby="tab-panel">
     <div class="stats" id="panel-stats"></div>
+    <div class="note" id="panel-src"></div>
     <div class="filters" id="panel-filters">
       <button data-f="all" data-on="1">All</button>
       <button data-f="killed">Killed</button>
@@ -152,7 +158,7 @@
   </section>
 
   <!-- --------------------------------------------------------------- about -->
-  <section id="about">
+  <section id="about" role="tabpanel" aria-labelledby="tab-about">
     <h2>The one rule</h2>
     <div class="note"><b>An LLM may kill a finding. It may never create one.</b><br>
       A model saying “this looks exploitable” is worth nothing until it executes. A model
@@ -245,9 +251,12 @@ const SNAPSHOT = {
       {"lane":"zai/glm-4.7-flash","state":"no-key","ok":0,"fail":0,"cooldown_left":0}
     ]},
   panel: [
-    {"contract":"Message","function":"recoverAddressFromSignedMessage(bytes,bytes,bool)","lens":"ecrecover_zero_address","confidence":0.5,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"The code requires that each recovered address passes _validatorContract.isValidator(recoveredAddress); a zero address will fail this check, preventing the ecrecover_zero_address issue.","lanes_used":["pollinations/openai","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"right"},
-    {"contract":"Message","function":"recoverAddressFromSignedMessage(bytes,bytes,bool)","lens":"ecrecover_zero_address","confidence":0.52,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":3},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"The require(_validatorContract.isValidator(recoveredAddress)) guard rejects the zero address returned by ecrecover, preventing the ecrecover_zero_address issue.","lanes_used":["pollinations/openai","ovhcloud/qwen3.6-35b-a3b","ovhcloud/Mistral-Small-3.2-24B-Instruct-2506"],"verdict_check":"right"},
-    {"contract":"ForeignBridgeErcToNative","function":"onExecuteMessage(address,uint256)","lens":"unchecked_call_return","confidence":0.45,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2,"UNCERTAIN":1},"agreement":0.67,"quorum_met":true,"cited":true,"substantive":true,"reason":"The flagged line is a standard ERC20 transferFrom call, not a low-level .call(), so the unchecked_call_return rule does not apply.","lanes_used":["pollinations/openai","ovhcloud/Qwen3.8-27B","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"right"},
+    {"contract":"Message","function":"recoverAddressFromSignedMessage(bytes,bytes,bool)","lens":"ecrecover_zero_address","confidence":0.5,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"The code requires that each recovered address passes _validatorContract.isValidator(recoveredAddress); a zero address will fail this check, preventing the ecrecover_zero_address issue.","lanes_used":["pollinations/openai","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"partly",
+    "check_note":"Right that address(0) cannot pass isValidator - if that guard is on the path. It does not show it is on every path, so the harness needs to confirm coverage."},
+    {"contract":"Message","function":"recoverAddressFromSignedMessage(bytes,bytes,bool)","lens":"ecrecover_zero_address","confidence":0.52,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":3},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"The require(_validatorContract.isValidator(recoveredAddress)) guard rejects the zero address returned by ecrecover, preventing the ecrecover_zero_address issue.","lanes_used":["pollinations/openai","ovhcloud/qwen3.6-35b-a3b","ovhcloud/Mistral-Small-3.2-24B-Instruct-2506"],"verdict_check":"partly",
+    "check_note":"Same guard, cited more concretely (it names the require itself). Needs the same path-coverage check before it can be trusted."},
+    {"contract":"ForeignBridgeErcToNative","function":"onExecuteMessage(address,uint256)","lens":"unchecked_call_return","confidence":0.45,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2,"UNCERTAIN":1},"agreement":0.67,"quorum_met":true,"cited":true,"substantive":true,"reason":"The flagged line is a standard ERC20 transferFrom call, not a low-level .call(), so the unchecked_call_return rule does not apply.","lanes_used":["pollinations/openai","ovhcloud/Qwen3.8-27B","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"partly",
+    "check_note":"The observation is correct - a plain transferFrom is not a low-level call - but it does not close the finding: an unchecked ERC20 return value is a real defect class. Right about the lens, wrong about the risk."},
     {"contract":"HomeBridgeErcToNative","function":"executeAffirmation(address,uint256)","lens":"unchecked_call_return","confidence":0.4,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"address(0).transfer(valueToBurn) reverts on failure, so the return value is never used and cannot be unchecked.","lanes_used":["pollinations/openai","ovhcloud/Qwen3.6-27B"],"verdict_check":"right"},
     {"contract":"HashiManager","function":"setThreshold(uint256)","lens":"unbounded_loop","confidence":0.35,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":true,"reason":"The loop is bounded by values.length, which is a finite array size, so the loop cannot run indefinitely.","lanes_used":["pollinations/openai","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"right"},
     {"contract":"GasTokenConnector","function":"_collectGasTokens()","lens":"unchecked_call_return","confidence":0.3,"verdict":"FALSE_POSITIVE","killed":true,"votes":{"FALSE_POSITIVE":2},"agreement":1.0,"quorum_met":true,"cited":true,"substantive":false,"reason":"The underscore prefix in _collectGasTokens() indicates internal function, restricting external access and making the unchecked call return value a non-issue for external attackers.","lanes_used":["pollinations/openai","ovhcloud/DeepSeek-V4.1-Flash-1017"],"verdict_check":"wrong"},
@@ -289,7 +298,7 @@ function getJSON(url, ms) {
 }
 
 async function loadLive() {
-  const out = { health: null, node: null, error: "" };
+  const out = { health: null, node: null, panel: null, error: "" };
   try {
     const [health, node] = await Promise.all([
       getJSON(NODE + "/api/llm/health", 4500),
@@ -298,7 +307,14 @@ async function loadLive() {
     out.health = health; out.node = node;
   } catch (e) {
     out.error = String(e.message || e);
+    return out;                     // no point asking for a panel from a dead node
   }
+  // The panel is a separate, optional call: a node can be up without having run
+  // one since it started, and that is a legitimate answer, not an error.
+  try {
+    const p = await getJSON(NODE + "/api/llm/panel/last", 4500);
+    if (p && p.ran) out.panel = p;
+  } catch (e) { /* panel stays null */ }
   return out;
 }
 
@@ -339,6 +355,24 @@ function renderOverview(data, live) {
       "monthly quota exceeded — all services suspended 2026-11-18T12:20:40Z · " +
       "this page is showing its embedded snapshot"));
     box.append(c);
+  }
+
+  // Provenance is per-section, not per-page. Live lanes with a snapshot panel is
+  // a completely different claim from all-snapshot, and the page must not blur
+  // the two into a single hopeful "LIVE" pill.
+  const prov = $("#provenance");
+  if (prov) {
+    prov.replaceChildren();
+    const mk = (label, live) => {
+      const b = el("span", "badge " + (live ? "ok" : "neutral"),
+                   label + (live ? " LIVE" : " SNAPSHOT"));
+      b.style.marginRight = "6px";
+      b.style.marginBottom = "4px";
+      b.style.display = "inline-block";
+      return b;
+    };
+    prov.append(mk("lanes", Boolean(live.health)), mk("node", Boolean(live.node)),
+                mk("panel", Boolean(live.panel)));
   }
 
   const src = $("#source-box");
@@ -393,7 +427,7 @@ function bucket(p) {
   return "kept";
 }
 
-function renderPanel(data) {
+function renderPanel(data, isLive) {
   PANEL = data.panel || [];
   const killed = PANEL.filter(p => p.killed).length;
   const refused = PANEL.filter(p => bucket(p) === "refused").length;
@@ -404,15 +438,44 @@ function renderPanel(data) {
     stat(PANEL.length ? pct(killed / PANEL.length) : "—", "kill rate"),
   );
   const note = $("#panel-note");
-  const right = PANEL.filter(p => p.verdict_check === "right").length;
-  const wrong = PANEL.filter(p => p.verdict_check === "wrong").length;
+  const banner = $("#panel-src");
+  if (banner) {
+    banner.style.display = isLive ? "none" : "block";
+  }
+  if (!isLive) {
+    if (banner) {
+      banner.replaceChildren();
+      banner.append(el("b", null, "These verdicts are a snapshot, not the live node. "));
+      banner.append(document.createTextNode(
+        "They come from the " + ((data.corpus || "corpus").split(" ")[0]) +
+        " run on " + (data.generated || "?") + ". The live node does not self-grade " +
+        "and its panel output appears here only when it has actually run one."));
+    }
+  }
+  // Hand adjudication exists only for the snapshot it was done on. Reading the
+  // field on live data would report "0 of N right" - a confident, wrong score.
+  const checked = PANEL.filter(p => ["right", "partly", "wrong"]
+                                    .includes(p.verdict_check));
   note.replaceChildren();
   note.append(el("b", null, "The honest scorecard. "));
-  note.append(document.createTextNode(
-    right + " of " + killed + " kills were right, " + wrong + " were wrong. " +
-    "The wrong ones argued from a naming convention instead of a mechanism — which is " +
-    "exactly why the citation and substance gates exist. A kill that fails either gate " +
-    "does not happen."));
+  if (checked.length) {
+    const n = k => checked.filter(p => p.verdict_check === k).length;
+    const solid = n("right"), partial = n("partly"), wrong = n("wrong");
+    note.append(document.createTextNode(
+      "Of " + killed + " kills: " + solid + " confirmed, " + partial +
+      " right about the code but not enough on its own to close the finding, " +
+      wrong + " plainly wrong. " +
+      "The plainly-wrong one argued from a naming convention instead of a mechanism — " +
+      "which is exactly why the citation and substance gates exist. A kill that fails " +
+      "either gate does not happen. These verdicts were hand-checked on the " +
+      esc((data.corpus || "this run").split(" ")[0]) + " run; the live node does not " +
+      "self-grade."));
+  } else {
+    note.append(document.createTextNode(
+      "Live panel output. Nobody has hand-checked these verdicts yet, so this page " +
+      "does not claim any of them are right — a dashboard that grades its own homework " +
+      "is worse than one that admits it has not."));
+  }
   drawPanel();
 }
 
@@ -439,10 +502,13 @@ function drawPanel() {
     const reason = el("div", "reason" + (p.reason ? "" : " none"),
       p.reason ? "“" + p.reason + "”" : "no reason given");
     card.append(reason);
-    if (p.verdict_check === "wrong") {
+    if (p.verdict_check && p.verdict_check !== "right") {  // hand-checked runs only
       const w = el("div", "meta");
-      w.style.color = "var(--amber)";
-      w.textContent = "↳ hand-checked: this kill was wrong";
+      w.style.color = p.verdict_check === "wrong" ? "var(--red)" : "var(--amber)";
+      w.textContent = "↳ hand-checked: " +
+        (p.verdict_check === "wrong" ? "this kill was wrong"
+                                     : "right about the code, not enough to close the finding") +
+        (p.check_note ? " — " + p.check_note : "");
       card.append(w);
     }
     list.append(card);
@@ -452,17 +518,39 @@ function drawPanel() {
 // ---------------------------------------------------------------------------
 // Tabs
 // ---------------------------------------------------------------------------
-function tab(name) {
+const TABS = ["overview", "lanes", "panel", "about"];
+
+function tab(name, push) {
+  if (!TABS.includes(name)) name = "overview";
   for (const b of document.querySelectorAll("nav button")) {
-    b.setAttribute("aria-selected", String(b.dataset.tab === name));
+    const on = b.dataset.tab === name;
+    b.setAttribute("aria-selected", String(on));
+    b.tabIndex = on ? 0 : -1;
   }
   for (const s of document.querySelectorAll("section")) {
     s.classList.toggle("on", s.id === name);
   }
   if (name === "panel") drawPanel();
+  // A tab state you cannot link to is a tab state you lose on refresh, and this
+  // page gets opened from a phone on a flaky connection. Deep-link it.
+  if (push !== false) {
+    history.replaceState(null, "", "#" + name);
+  }
+  document.title = name === "overview" ? "DARWIN · console"
+                                       : "DARWIN · " + name;
 }
 for (const b of document.querySelectorAll("nav button")) {
   b.addEventListener("click", () => tab(b.dataset.tab));
+  // arrow keys move between tabs, Home/End jump to the ends (WAI-ARIA pattern)
+  b.addEventListener("keydown", e => {
+    const i = TABS.indexOf(b.dataset.tab);
+    let n = null;
+    if (e.key === "ArrowRight") n = TABS[(i + 1) % TABS.length];
+    else if (e.key === "ArrowLeft") n = TABS[(i - 1 + TABS.length) % TABS.length];
+    else if (e.key === "Home") n = TABS[0];
+    else if (e.key === "End") n = TABS[TABS.length - 1];
+    if (n) { e.preventDefault(); tab(n); document.querySelector(`[data-tab="${n}"]`).focus(); }
+  });
 }
 for (const b of document.querySelectorAll("#panel-filters button")) {
   b.addEventListener("click", () => {
@@ -480,14 +568,18 @@ for (const b of document.querySelectorAll("#panel-filters button")) {
 function paint(data, live) {
   renderOverview(data, live);
   renderLanes(data);
-  renderPanel(data);
+  renderPanel(data, Boolean(live.panel));
   const pill = $("#status");
   if (live.node) {
     pill.className = "pill live";
     pill.textContent = "live · render";
+    const rb0 = $("#retry");
+    if (rb0) rb0.style.display = "none";
   } else {
     pill.className = "pill down";
     pill.textContent = "node suspended · snapshot";
+    const rb = $("#retry");
+    if (rb) rb.style.display = "inline-block";
   }
   $("#foot-left").textContent =
     live.node ? "static page · live data from render" : "static page · embedded snapshot";
@@ -495,7 +587,46 @@ function paint(data, live) {
 }
 
 paint(SNAPSHOT, { node: null });
+tab((location.hash || "#overview").slice(1), false);
+addEventListener("hashchange", () => tab(location.hash.slice(1), false));
+
+let REFRESH = null;
+
+function scheduleRefresh(ok) {
+  // Only poll when the node answers. Hammering a suspended service from every
+  // open tab is how a free host starts rate-limiting the thing you are trying
+  // to observe; and a suspended service can be down for a month.
+  clearInterval(REFRESH);
+  if (ok) REFRESH = setInterval(refresh, 60000);
+}
+
+async function refresh() {
+  const live = await loadLive();
+  const merged = JSON.parse(JSON.stringify(SNAPSHOT));
+  if (live.node) {
+    merged.source = "live";
+    merged.generated = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+    if (live.health) merged.health = live.health;
+    if (live.health && live.health.lanes_total) merged.lanes_total = live.health.lanes_total;
+    if (live.health && live.health.providers) merged.providers = live.health.providers.length;
+  }
+  paint(merged, live);
+  scheduleRefresh(Boolean(live.node));
+  return live;
+}
+
+$("#retry").addEventListener("click", () => {
+  const btn = $("#retry");
+  btn.textContent = "checking…";
+  refresh().then(live => {
+    btn.textContent = live.node ? "live" : "still down";
+    setTimeout(() => { btn.style.display = live.node ? "none" : "inline-block";
+                       btn.textContent = "retry live"; }, 1800);
+  });
+});
+
 loadLive().then(live => {
+  scheduleRefresh(Boolean(live.node));
   if (!live.node) return;
   const merged = JSON.parse(JSON.stringify(SNAPSHOT));
   merged.source = "live";
@@ -503,6 +634,19 @@ loadLive().then(live => {
   if (live.health) merged.health = live.health;
   if (live.health && live.health.lanes_total) merged.lanes_total = live.health.lanes_total;
   if (live.health && live.health.providers) merged.providers = live.health.providers.length;
+  if (live.panel && live.panel.rows) {
+    // A real panel run: show it, and drop the hand adjudication, which belongs
+    // to the snapshot it was performed on.
+    merged.panel = live.panel.rows.map(r => ({
+      contract: r.contract || "?", function: r.function || "?",
+      lens: r.lens || "?", confidence: r.confidence,
+      verdict: r.verdict, killed: Boolean(r.killed), votes: r.votes || {},
+      agreement: r.agreement || 0, quorum_met: Boolean(r.quorum_met),
+      reason: r.reason || "", lanes_used: r.lanes_used || [],
+    }));
+    merged.corpus = live.panel.root || "live run";
+    merged.generated = live.panel.generated || merged.generated;
+  }
   paint(merged, live);
 });
 </script>
