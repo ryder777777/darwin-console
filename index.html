@@ -216,6 +216,15 @@
 // backend is down is a dashboard that tells you nothing exactly when you need it.
 // ---------------------------------------------------------------------------
 const NODE = "https://darwin-omega-wealth-swarm.onrender.com";
+
+// A permanent, free, CORS-open home for this node's status.
+//
+// Render suspends the whole account when the monthly quota runs out, and it did
+// on 2026-11-18. A dashboard whose only source of truth can vanish for a month
+// is mostly a snapshot. A Hugging Face dataset does not do that, so it is the
+// primary source now and Render is a bonus when it happens to be alive.
+const STATUS_URL =
+  "https://huggingface.co/datasets/Ryder7777/darwin-swarm-memory/resolve/main/status.json";
 const SNAPSHOT = {
   generated: "2026-11-18T13:10:00Z",
   source: "snapshot",
@@ -297,8 +306,19 @@ function getJSON(url, ms) {
   });
 }
 
+async function loadStatus() {
+  // The always-available source: whatever machine last ran the publisher.
+  try {
+    const s = await getJSON(STATUS_URL, 6000);
+    return s && typeof s === "object" ? s : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function loadLive() {
-  const out = { health: null, node: null, panel: null, error: "" };
+  const out = { health: null, node: null, panel: null, status: null, error: "" };
+  out.status = await loadStatus();
   try {
     const [health, node] = await Promise.all([
       getJSON(NODE + "/api/llm/health", 4500),
@@ -371,8 +391,16 @@ function renderOverview(data, live) {
       b.style.display = "inline-block";
       return b;
     };
-    prov.append(mk("lanes", Boolean(live.health)), mk("node", Boolean(live.node)),
-                mk("panel", Boolean(live.panel)));
+    // "PUBLISHED" is its own state: real counters from a real run, but not from
+    // this instant. Calling it LIVE would be the same lie in a new place.
+    const hf = Boolean(live.status && live.status.lanes);
+    const mkPub = () => {
+      const b = el("span", "badge neutral", "lanes PUBLISHED");
+      b.style.marginRight = "6px"; b.style.marginBottom = "4px";
+      b.style.display = "inline-block"; return b;
+    };
+    prov.append(live.health ? mk("lanes", true) : (hf ? mkPub() : mk("lanes", false)),
+                mk("node", Boolean(live.node)), mk("panel", Boolean(live.panel)));
   }
 
   const src = $("#source-box");
@@ -565,12 +593,29 @@ for (const b of document.querySelectorAll("#panel-filters button")) {
 // ---------------------------------------------------------------------------
 // Boot: paint from the snapshot immediately, then upgrade to live if it answers.
 // ---------------------------------------------------------------------------
+function statusToHealth(st) {
+  // The publisher writes the same shape lanes_health() returns, minus counters we
+  // do not need. Normalise instead of trusting field-for-field equality.
+  if (!st || !st.lanes) return null;
+  const l = st.lanes;
+  return {
+    lanes_total: l.lanes_total, ready: l.ready,
+    keyless_enabled: l.keyless_enabled, providers: l.providers || [],
+    lanes: l.lanes || [],
+  };
+}
+
 function paint(data, live) {
   renderOverview(data, live);
   renderLanes(data);
   renderPanel(data, Boolean(live.panel));
   const pill = $("#status");
-  if (live.node) {
+  if (!live.node && live.status && live.status.lanes) {
+    pill.className = "pill live";
+    pill.textContent = "published · " + (live.status.runner || "unknown");
+    const rb1 = $("#retry");
+    if (rb1) rb1.style.display = "inline-block";
+  } else if (live.node) {
     pill.className = "pill live";
     pill.textContent = "live · render";
     const rb0 = $("#retry");
@@ -607,7 +652,15 @@ async function refresh() {
     merged.source = "live";
     merged.generated = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     if (live.health) merged.health = live.health;
-    if (live.health && live.health.lanes_total) merged.lanes_total = live.health.lanes_total;
+    const hfHealth = statusToHealth(live.status);
+  if (!live.health && hfHealth) {
+    merged.health = hfHealth;
+    merged.lanes_total = hfHealth.lanes_total;
+    merged.providers = (hfHealth.providers || []).length;
+    merged.generated = live.status.generated || merged.generated;
+    merged.source = "published by " + (live.status.runner || "?");
+  }
+  if (live.health && live.health.lanes_total) merged.lanes_total = live.health.lanes_total;
     if (live.health && live.health.providers) merged.providers = live.health.providers.length;
   }
   paint(merged, live);
@@ -625,18 +678,29 @@ $("#retry").addEventListener("click", () => {
   });
 });
 
-loadLive().then(live => {
-  scheduleRefresh(Boolean(live.node));
-  if (!live.node) return;
+// One merge path for both sources. The early return that used to sit here was
+// written when Render was the only source; with a published status as well it
+// silently dropped the status and painted the snapshot - the page said
+// "node suspended" while a perfectly good published run sat unused.
+function buildData(live) {
   const merged = JSON.parse(JSON.stringify(SNAPSHOT));
-  merged.source = "live";
-  merged.generated = new Date().toISOString().replace(/\.\d+Z$/, "Z");
-  if (live.health) merged.health = live.health;
-  if (live.health && live.health.lanes_total) merged.lanes_total = live.health.lanes_total;
-  if (live.health && live.health.providers) merged.providers = live.health.providers.length;
+  const hf = statusToHealth(live.status);
+  if (!live.health && hf) {
+    merged.health = hf;
+    merged.lanes_total = hf.lanes_total;
+    merged.providers = (hf.providers || []).length;
+    merged.generated = (live.status && live.status.generated) || merged.generated;
+    merged.source = "published by " + ((live.status && live.status.runner) || "?");
+    merged.corpus = "swarm status";
+  }
+  if (live.node) {
+    merged.source = "live";
+    merged.generated = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+    if (live.health) merged.health = live.health;
+    if (live.health && live.health.lanes_total) merged.lanes_total = live.health.lanes_total;
+    if (live.health && live.health.providers) merged.providers = live.health.providers.length;
+  }
   if (live.panel && live.panel.rows) {
-    // A real panel run: show it, and drop the hand adjudication, which belongs
-    // to the snapshot it was performed on.
     merged.panel = live.panel.rows.map(r => ({
       contract: r.contract || "?", function: r.function || "?",
       lens: r.lens || "?", confidence: r.confidence,
@@ -647,8 +711,17 @@ loadLive().then(live => {
     merged.corpus = live.panel.root || "live run";
     merged.generated = live.panel.generated || merged.generated;
   }
+  return merged;
+}
+
+loadLive().then(live => {
+  scheduleRefresh(Boolean(live.node));
+  if (!live.node && !live.status) return;
+  const merged = buildData(live);
   paint(merged, live);
 });
+
+
 </script>
 </body>
 </html>

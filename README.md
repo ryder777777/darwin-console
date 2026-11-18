@@ -13,6 +13,19 @@ embedded snapshot and upgrades to live data if the Render node answers:
 | `/api/llm/health` | all 23 lanes, their state and counters |
 | `/api/llm/panel/last` | the most recent panel run, or `{ran:false}` |
 
+Render suspends a whole account when its monthly quota runs out — it did on
+2026-11-18 — so the node is a bonus source, not the source of truth. The primary
+one is a **published status file** on a Hugging Face dataset, written by
+`tools/publish_status.py` from a GitHub Actions schedule. Free, permanent,
+CORS-open, and readable straight from the browser:
+
+```
+https://huggingface.co/datasets/Ryder7777/darwin-swarm-memory/resolve/main/status.json
+```
+
+A Hugging Face Space on cpu-basic would have been the nicer answer; docker and
+gradio Spaces need PRO, static ones do not, and this page is static.
+
 ## The rule this page is built around
 
 **A dashboard must not lie when its backend is down.** Every section carries its
