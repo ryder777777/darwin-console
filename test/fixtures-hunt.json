@@ -1,0 +1,46 @@
+{
+ "ok": true,
+ "generated": "2026-11-18T15:01:50Z",
+ "runner": "github-actions",
+ "provenance": "cron sweep on a CI runner; not a live daemon",
+ "corpus": {
+  "root": "/tmp/corpus",
+  "sol_files": 132,
+  "exists": true
+ },
+ "elapsed_sec": 3.34,
+ "files_scanned": 132,
+ "lines_scanned": 8196,
+ "contracts": 138,
+ "functions": 524,
+ "raw": 9,
+ "survivors": 8,
+ "killed": 1,
+ "kill_rate": 0.1111,
+ "by_lens": {
+  "packed_collision": 1,
+  "ecrecover_zero_address": 2,
+  "unchecked_call_return": 5
+ },
+ "lens_crashes": {},
+ "min_confidence": 0.3,
+ "findings_truncated": 0,
+ "findings": [
+  {
+   "lens": "packed_collision",
+   "contract": "Message",
+   "function": "hashMessage(bytes message, bool isAMBMessage)",
+   "file": "contracts/libraries/Message.sol",
+   "line": 72,
+   "snippet": "return keccak256(abi.encodePacked(prefix, msgLength, message)); }"
+  },
+  {
+   "lens": "ecrecover_zero_address",
+   "contract": "Message",
+   "function": "recoverAddressFromSignedMessage(bytes signature, bytes message, bool isAMBMessage)",
+   "file": "contracts/libraries/Message.sol",
+   "line": 69,
+   "snippet": "return ecrecover(hashMessage(message, isAMBMessage), v, r, s);"
+  }
+ ]
+}

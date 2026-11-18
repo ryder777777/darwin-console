@@ -64,8 +64,15 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   const sel = d.querySelector('[data-tab="panel"]');
   ok('aria-selected on active tab', sel.getAttribute('aria-selected') === 'true');
   ok('inactive tabs tabindex=-1', d.querySelector('[data-tab="lanes"]').tabIndex === -1);
-  ok('aria-controls present', d.querySelectorAll('nav button[aria-controls]').length === 4);
-  ok('sections have role=tabpanel', d.querySelectorAll('section[role="tabpanel"]').length === 4);
+  // Count the tabs instead of hardcoding 4. The Hunst tab was added on
+  // 2026-11-18 and this assertion then failed for the wrong reason - the number
+  // was never the point, the pairing was.
+  const tabs = [...d.querySelectorAll('nav button[aria-controls]')];
+  const panels = [...d.querySelectorAll('section[role="tabpanel"]')];
+  ok('every nav tab has aria-controls', tabs.length > 0 && tabs.every(b => b.getAttribute('aria-controls')));
+  ok('tab count matches panel count', tabs.length === panels.length);
+  ok('every tab points at a real panel',
+     tabs.every(b => !!d.getElementById(b.getAttribute('aria-controls'))));
 
   // arrow key nav
   d.querySelector('[data-tab="overview"]').dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));

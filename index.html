@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
+<meta name="description" content="LLM lane health and finding triage for the DARWIN swarm. Reads a published status file, so it works when the backend does not.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0d12">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="manifest" href="manifest.webmanifest">
 <title>DARWIN · console</title>
 <style>
   :root{
@@ -88,6 +94,17 @@
          gap:12px;flex-wrap:wrap}
   a{color:var(--accent);text-decoration:none}
   a:hover{text-decoration:underline}
+  /* keyboard users need to see where they are; there was no focus ring at all */
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+  .skip{position:absolute;left:-9999px;top:8px;z-index:10;background:var(--panel);
+        border:1px solid var(--accent);color:var(--text);padding:8px 14px;border-radius:8px}
+  .skip:focus{left:8px}
+  /* a status page that animates for someone who asked it not to is a bug */
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  }
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+      clip:rect(0 0 0 0);white-space:nowrap;border:0}
   @media(max-width:560px){
     .wrap{padding:18px 13px 60px}
     .stat .v{font-size:20px}
@@ -96,6 +113,7 @@
 </style>
 </head>
 <body>
+<a class="skip" href="#main">skip to content</a>
 <div class="wrap">
   <header>
     <div>
@@ -109,15 +127,18 @@
     </div>
   </header>
 
-  <nav role="tablist">
+  <p id="live-status" class="sr" role="status" aria-live="polite"></p>
+
+  <nav role="tablist" aria-label="Console sections">
     <button role="tab" aria-selected="true" aria-controls="overview" data-tab="overview">Overview</button>
     <button role="tab" aria-selected="false" aria-controls="lanes" data-tab="lanes">LLM lanes</button>
     <button role="tab" aria-selected="false" aria-controls="panel" data-tab="panel">Triage panel</button>
+    <button role="tab" aria-selected="false" aria-controls="hunts" data-tab="hunts">Hunts</button>
     <button role="tab" aria-selected="false" aria-controls="about" data-tab="about">How it works</button>
   </nav>
 
   <!-- ------------------------------------------------------------ overview -->
-  <section id="overview" role="tabpanel" aria-labelledby="tab-overview" class="on">
+  <main id="main"><section id="overview" role="tabpanel" aria-labelledby="tab-overview" class="on">
     <div id="provenance" style="margin-bottom:14px"></div>
     <div class="stats" id="stat-row"></div>
     <h2>Node</h2>
@@ -155,6 +176,17 @@
     </div>
     <div id="panel-list"></div>
     <div class="note warn" id="panel-note"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- hunts -->
+  <section id="hunts" role="tabpanel" aria-labelledby="tab-hunts">
+    <div class="stats" id="hunt-stats"></div>
+    <div class="note" id="hunt-src"></div>
+    <div class="filters" id="hunt-filters">
+      <button data-hf="all" data-on="1">All</button>
+    </div>
+    <div id="hunt-list"></div>
+    <div class="note warn" id="hunt-note"></div>
   </section>
 
   <!-- --------------------------------------------------------------- about -->
@@ -198,6 +230,7 @@
       published behaviour, and that is all this does.</div>
   </section>
 
+</main>
   <footer>
     <span id="foot-left">static page · data fetched at open</span>
     <span id="foot-right"></span>
@@ -225,6 +258,13 @@ const NODE = "https://darwin-omega-wealth-swarm.onrender.com";
 // primary source now and Render is a bonus when it happens to be alive.
 const STATUS_URL =
   "https://huggingface.co/datasets/Ryder7777/darwin-swarm-memory/resolve/main/status.json";
+
+// The real hunt output, not the triage panel. Written by
+// tools/hunt_and_publish.py running on a GitHub Actions runner (2 vCPU / 7 GB)
+// because the free Render instance was 0.1 vCPU / 512 MB and suspended itself on
+// quota. Same dataset, same CORS, same permanence.
+const HUNT_URL =
+  "https://huggingface.co/datasets/Ryder7777/darwin-swarm-memory/resolve/main/hunt.json";
 const SNAPSHOT = {
   generated: "2026-11-18T13:10:00Z",
   source: "snapshot",
@@ -336,6 +376,101 @@ async function loadLive() {
     if (p && p.ran) out.panel = p;
   } catch (e) { /* panel stays null */ }
   return out;
+}
+
+// ---------------------------------------------------------------- hunt results
+// This is the honest replacement for "the node ran things". A cron sweep on a CI
+// runner produced it, it is stored on HF, and this page fetched it with no
+// backend. When it is absent the page says so instead of showing sample rows.
+
+async function loadHunt() {
+  try {
+    return await getJSON(HUNT_URL, 8000);
+  } catch (e) {
+    return null;
+  }
+}
+
+function paintHunt(h) {
+  const stats = $("#hunt-stats");
+  const src = $("#hunt-src");
+  const list = $("#hunt-list");
+  const note = $("#hunt-note");
+  if (!h) {
+    stats.replaceChildren(el("span", "stat bad", "no hunt published yet"));
+    src.textContent = "hunt.json was not reachable from this origin.";
+    list.replaceChildren();
+    note.textContent = "The Actions workflow publishes it every 6 hours. An " +
+      "honest empty state beats invented findings.";
+    return;
+  }
+  // `el` returns a NODE, so string-concatenating it renders "[object
+  // HTMLElement]" instead of the number. Build each stat by appending parts.
+  function stat(parts, cls) {
+    const wrap = el("span", "stat " + (cls || ""));
+    for (const part of parts) {
+      wrap.appendChild(typeof part === "string"
+        ? document.createTextNode(part)
+        : el("b", "", String(part.v)));
+    }
+    stats.appendChild(wrap);
+  }
+  stats.replaceChildren();
+  stat([{ v: h.survivors }, " findings"], "ok");
+  stat(["over ", { v: h.files_scanned }, " files"]);
+  stat([{ v: h.lines_scanned }, " lines"]);
+  stat([{ v: h.contracts }, " contracts"]);
+  stat([{ v: h.killed }, " killed"]);
+  stat([(h.kill_rate * 100).toFixed(0) + "% kill rate"]);
+  stat([{ v: h.elapsed_sec }, "s wall"]);
+
+  src.textContent = "sweep " + esc(h.generated) + " · runner " + esc(h.runner) +
+    " · " + esc(h.provenance);
+
+  const lenses = h.by_lens || {};
+  const chips = el("div", "filters");
+  const btn = el("button", "", "All"); btn.dataset.hf = "all"; btn.dataset.on = "1";
+  chips.appendChild(btn);
+  for (const [k, n] of Object.entries(lenses)) {
+    const b = el("button", "", k + " " + n);
+    b.dataset.hf = k;
+    chips.appendChild(b);
+  }
+  const old = $("#hunt-filters");
+  old.replaceWith(chips);
+  chips.id = "hunt-filters";
+
+  const rows = h.findings || [];
+  function render(f) {
+    list.replaceChildren();
+    const shown = rows.filter(r => f === "all" || r.lens === f);
+    if (!shown.length) {
+      list.appendChild(el("div", "note", "nothing in this lens."));
+      return;
+    }
+    for (const r of shown) {
+      const card = el("article", "card");
+      card.appendChild(el("div", "card-h", r.lens + " · " + (r.contract || "?")));
+      card.appendChild(el("div", "mono", r.function || "?" ));
+      card.appendChild(el("div", "mono dim",
+        (r.file || "").split("/").slice(-2).join("/") + ":" + r.line));
+      if (r.snippet) card.appendChild(el("pre", "code", r.snippet));
+      list.appendChild(card);
+    }
+  }
+  render("all");
+
+  chips.addEventListener("click", ev => {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    for (const o of chips.querySelectorAll("button")) o.removeAttribute("data-on");
+    b.dataset.on = "1";
+    render(b.dataset.hf);
+  });
+
+  note.textContent = "A sweep, not a daemon: " +
+    (h.findings_truncated ? h.findings_truncated + " more findings not shown. " : "") +
+    "Cron jobs are delayed under load, and there is no live API here.";
 }
 
 // ---------------------------------------------------------------------------
@@ -626,6 +761,16 @@ function paint(data, live) {
     const rb = $("#retry");
     if (rb) rb.style.display = "inline-block";
   }
+  const announce = $("#live-status");
+  if (announce) {
+    announce.textContent =
+      live.node ? "Live: the node is answering." :
+      (live.status && live.status.lanes)
+        ? "Published status from " + (live.status.runner || "a runner") +
+          ", " + (live.status.lanes.ready || 0) + " of " +
+          (live.status.lanes.lanes_total || 0) + " lanes ready."
+        : "Snapshot data. No backend and no published status.";
+  }
   $("#foot-left").textContent =
     live.node ? "static page · live data from render" : "static page · embedded snapshot";
   $("#foot-right").textContent = "snapshot " + esc(data.generated);
@@ -720,6 +865,12 @@ loadLive().then(live => {
   const merged = buildData(live);
   paint(merged, live);
 });
+
+// The hunt tab has its own source (HF, written by the Actions cron) and must
+// render even when the node is dead - that is the whole point of moving the
+// hunt off Render.
+paintHunt(null);                     // honest empty state until the fetch lands
+loadHunt().then(paintHunt);
 
 
 </script>
